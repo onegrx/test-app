@@ -1,0 +1,1 @@
+final case class ExpressionInput(expression: String)
