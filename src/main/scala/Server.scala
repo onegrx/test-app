@@ -25,7 +25,7 @@ object Server {
       post {
         path("evaluate") {
           entity(as[ExpressionInput]) { expr =>
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, Calculator.calculate(expr.expression)))
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, Calculator.calculate(expr.expression).toString))
           }
         }
       }
