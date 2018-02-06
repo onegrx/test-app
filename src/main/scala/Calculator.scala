@@ -1,3 +1,5 @@
+import akka.stream.ActorMaterializer
+
 import scala.util.parsing.combinator.JavaTokenParsers
 
 object Calculator {
@@ -12,12 +14,16 @@ object Calculator {
     case Num(t) => t
   }
 
-  def calculate(expression: String) = eval(parsers.parseTree(expression).get)
+  def calc(expression: String) = eval(parsers.parseTree(expression).get)
+
+  def calculateAsync(expression: String)(implicit mat: ActorMaterializer) = {
+    val treeExp = parsers.parseTree(expression).get
+    AsyncExecutor.execute(treeExp).run()
+  }
 
 }
 
 class ArithmeticParsers extends JavaTokenParsers {
-
   def expr: Parser[TreeExp] = term ~ rep(("+" | "-") ~ term) ^^ {
     case e ~ rest => rest.foldLeft(e) {
       case (x, "+" ~ y) => Add(x, y)
