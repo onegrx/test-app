@@ -16,45 +16,54 @@ import scala.io.StdIn
 import scala.util.{Failure, Success}
 
 final case class ExpressionInput(expression: String)
+
 final case class ExpressionOutput(result: Double)
 
-object Server {
+trait RestServer {
 
-  implicit val system: ActorSystem = ActorSystem()
-  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val system: ActorSystem
+  implicit val materializer: ActorMaterializer
+
+  implicit val inputFormat: RootJsonFormat[ExpressionInput] = jsonFormat1(ExpressionInput)
+
+  implicit object outputFormat extends RootJsonFormat[ExpressionOutput] {
+
+    val df = new DecimalFormat("###.#")
+    df.setRoundingMode(RoundingMode.HALF_UP)
+
+    override def write(obj: ExpressionOutput) = JsObject("result" -> JsNumber(df.format(obj.result)))
+
+    override def read(json: JsValue) = {
+      json.asJsObject.getFields("result") match {
+        case Seq(JsNumber(n)) => ExpressionOutput(n.toDouble)
+        case _ => spray.json.deserializationError("Can't read input")
+      }
+    }
+
+  }
+
+  val route: Route =
+    post {
+      path("evaluate") {
+        entity(as[ExpressionInput]) { expr =>
+          val res = Calculator.calculateAsync(expr.expression)
+          onComplete(res) {
+            case Success(result) => complete(ExpressionOutput(result))
+            case Failure(_) => complete(StatusCodes.InternalServerError)
+          }
+
+        }
+      }
+    }
+}
+
+object Server extends RestServer {
+
+  override implicit val system: ActorSystem = ActorSystem()
+  override implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   def main(args: Array[String]): Unit = {
-
-    implicit val inputFormat: RootJsonFormat[ExpressionInput] = jsonFormat1(ExpressionInput)
-    implicit object outputFormat extends RootJsonFormat[ExpressionOutput] {
-
-      val df = new DecimalFormat("###.#")
-      df.setRoundingMode(RoundingMode.HALF_UP)
-
-      override def write(obj: ExpressionOutput) = JsObject("result" -> JsNumber(df.format(obj.result)))
-      override def read(json: JsValue) = {
-        json.asJsObject.getFields("result") match {
-          case Seq(JsNumber(n)) => ExpressionOutput(n.toDouble)
-          case _ => spray.json.deserializationError("Can't read input")
-        }
-      }
-
-    }
-
-    val route: Route =
-      post {
-        path("evaluate") {
-          entity(as[ExpressionInput]) { expr =>
-            val res = Calculator.calculateAsync(expr.expression)
-            onComplete(res) {
-              case Success(result) => complete(ExpressionOutput(result))
-              case Failure(e) => complete(StatusCodes.InternalServerError)
-            }
-
-          }
-        }
-      }
 
     val bindingFuture = Http().bindAndHandle(route, "localhost", 5555)
     println(s"Server online at http://localhost:5555/\nPress RETURN to stop...")
