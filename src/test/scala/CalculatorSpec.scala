@@ -1,4 +1,4 @@
-import akka.http.scaladsl.model.{HttpEntity, HttpMethods, HttpRequest, MediaTypes}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.util.ByteString
 import org.scalatest.{FlatSpec, Matchers}
@@ -30,12 +30,30 @@ class CalculatorSpec extends FlatSpec with Matchers with ScalatestRouteTest with
 
   "The server" should "return proper results via HTTP" in {
     post(expressionSpec._1) ~> route ~> check {
-      status.isSuccess() shouldEqual true
+      status.isSuccess shouldEqual true
       responseAs[ExpressionOutput].result shouldEqual expressionSpec._2
     }
     post("1/2") ~> route ~> check {
-      status.isSuccess() shouldEqual true
+      status.isSuccess shouldEqual true
       responseAs[ExpressionOutput].result shouldEqual 0.5
     }
+  }
+
+  it should "deal with division by zero" in {
+    post("1/(2-2)") ~> route ~> check {
+      status shouldEqual StatusCodes.UnprocessableEntity
+    }
+  }
+
+  it should "not respond with value when expression is invalid" in {
+    def invalid(e: String) = post(e) ~> route ~> check {
+      status shouldEqual StatusCodes.UnprocessableEntity
+    }
+    invalid("a")
+    invalid("/12")
+    invalid("")
+    invalid("(1+2))")
+    invalid("(1+2")
+    invalid("(1+2(")
   }
 }

@@ -1,5 +1,6 @@
 import akka.stream.ActorMaterializer
 
+import scala.util.Try
 import scala.util.parsing.combinator.JavaTokenParsers
 
 object Calculator {
@@ -17,8 +18,8 @@ object Calculator {
   def calc(expression: String) = eval(parsers.parseTree(expression).get)
 
   def calculateAsync(expression: String)(implicit mat: ActorMaterializer) = {
-    val treeExp = parsers.parseTree(expression).get
-    AsyncExecutor.execute(treeExp).run()
+    val treeExp = parsers.parseTree(expression)
+    Try(AsyncExecutor.execute(treeExp.get).run())
   }
 
 }

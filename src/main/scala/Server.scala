@@ -46,12 +46,15 @@ trait RestServer {
     post {
       path("evaluate") {
         entity(as[ExpressionInput]) { expr =>
-          val res = Calculator.calculateAsync(expr.expression)
-          onComplete(res) {
-            case Success(result) => complete(ExpressionOutput(result))
-            case Failure(_) => complete(StatusCodes.InternalServerError)
+          Calculator.calculateAsync(expr.expression) match {
+            case Success(res) =>  onComplete(res) {
+              case Success(result) =>
+                if (result.isInfinite) complete(StatusCodes.UnprocessableEntity)
+                else complete(ExpressionOutput(result))
+              case Failure(_) => complete(StatusCodes.InternalServerError)
+            }
+            case Failure(_) => complete(StatusCodes.UnprocessableEntity)
           }
-
         }
       }
     }
